@@ -62,14 +62,21 @@
 | auto_download_font | bool | true | resources/fonts 无字体时自动下载默认字体（阿里妈妈方圆体 + emoji），失败回退系统字体 |
 | font_download_url | string | GitHub Releases | 中文字体下载地址，自备字体时填自己的链接，留空用默认 |
 | emoji_download_url | string | GitHub Releases | emoji 字体下载地址，Windows 系统自带 emoji 字体可不填 |
-| render_backend | string | pil | 日历渲染后端：`pil`（无额外依赖）或 `html`（HTML/CSS + Playwright + 系统 Chrome，效果与设计稿一致，失败自动降级 pil） |
+| render_backend | string | pil | 日历渲染后端：`pil`（无额外依赖）或 `html`（HTML/CSS + Playwright Chrome Headless Shell，效果与设计稿一致，失败自动降级 pil） |
 | theme_preset | string | white-1 | 日历主题：`white-1`（娅娅·泡泡初绽，默认）/ `white-2`（娅娅·马卡龙双层）/ `black-1`（达妮娅·暗夜泡泡）/ `black-2`（达妮娅·阿列夫之眼）/ `custom`（resources/theme.json 自定义） |
 
 > 达妮娅（暗夜）是**彩蛋**：无论 `theme_preset` 选什么主题，喂蛋糕回复都有 20% 概率以「达妮娅」（boss版）口吻出现，且**当日历图同时生成时，那张日历也会用达妮娅暗夜主题（black-1）渲染**。触发达妮娅彩蛋时，该条回复**不会触发 LLM 对话**。想关掉彩蛋，把 `resources/texts.py` 里的 `BLACK_*` 列表清空即可。
 
 ## 依赖
 
-无第三方依赖（AstrBot 自带 aiosqlite 与 Pillow）。
+PIL 后端无额外依赖（AstrBot 自带 aiosqlite 与 Pillow）。启用 HTML 后端时，需要安装 Python 依赖及 Playwright 的 Chrome Headless Shell：
+
+```bash
+python -m pip install -r requirements.txt
+python -m playwright install chromium-headless-shell
+```
+
+HTML 渲染固定使用 Playwright 管理的无头 Chromium，不调用系统 Google Chrome。浏览器进程会在插件生命周期内复用；启动或截图失败时自动降级到 PIL。
 
 ## 资源文件夹 `resources/`
 

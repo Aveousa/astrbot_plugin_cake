@@ -91,7 +91,7 @@
     },
     "render_backend": {
         "description": "日历渲染后端",
-        "hint": "pil=纯 PIL 绘制（无额外依赖，效果略逊）；html=HTML/CSS + Playwright + 系统 Chrome（效果与设计稿一致，服务器需安装 playwright 与 Chrome，失败自动降级 pil）",
+        "hint": "pil=纯 PIL 绘制（无额外依赖，效果略逊）；html=HTML/CSS + Playwright Chrome Headless Shell（需安装 playwright 并执行 python -m playwright install chromium-headless-shell，失败自动降级 pil）",
         "type": "string",
         "default": "pil",
         "options": ["pil", "html"]

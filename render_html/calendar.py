@@ -1,8 +1,8 @@
-"""HTML 版日历渲染：HTML/CSS + Playwright + 系统 Chrome，与设计稿 A1 一致。
+"""HTML 版日历渲染：HTML/CSS + Playwright Chrome Headless Shell，与设计稿 A1 一致。
 
 配色、泡泡、光晕与开关由主题驱动：预设见 resources/themes/（娅娅/达妮娅），
 用户自定义见 resources/theme.json。
-依赖：playwright（pip 安装）+ 系统 Chrome（channel='chrome'，失败回退捆绑 chromium）。
+依赖：playwright（pip 安装）+ chromium-headless-shell（Playwright 安装）。
 渲染失败由上层降级到 PIL。
 """
 import calendar
@@ -25,6 +25,9 @@ _render_executor_lock = threading.Lock()
 _render_lock = threading.Lock()
 _browser = None
 _playwright = None
+
+_BROWSER_START_TIMEOUT_MS = 30_000
+_HEADLESS_SHELL_INSTALL_COMMAND = "python -m playwright install chromium-headless-shell"
 
 
 def _get_render_executor():
@@ -65,7 +68,7 @@ def _close_browser():
 
 
 def _get_browser(launch_args):
-    """返回可用的浏览器实例；调用方必须持有 _render_lock。"""
+    """返回复用的 Chrome Headless Shell 实例；调用方必须持有 _render_lock。"""
     global _browser, _playwright
     if _browser is not None:
         try:
@@ -78,9 +81,18 @@ def _get_browser(launch_args):
         from playwright.sync_api import sync_playwright
         _playwright = sync_playwright().start()
     try:
-        _browser = _playwright.chromium.launch(channel='chrome', args=launch_args)
-    except Exception:
-        _browser = _playwright.chromium.launch(args=launch_args)
+        # 不指定 channel/executable_path：headless=True 会使用 Playwright 安装的
+        # chromium-headless-shell，而不是服务器上的完整 Google Chrome。
+        _browser = _playwright.chromium.launch(
+            headless=True,
+            args=launch_args,
+            timeout=_BROWSER_START_TIMEOUT_MS,
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "Playwright Chrome Headless Shell 启动失败；请执行 "
+            f"{_HEADLESS_SHELL_INSTALL_COMMAND}"
+        ) from exc
     return _browser
 
 
@@ -330,15 +342,18 @@ body {{ position: relative; }}
                avatar_path=None, today=None):
         if today is None:
             today = date.today().day if (date.today().year == year and date.today().month == month) else 0
-        ts = int(time.time())
+        # 纳秒时间戳避免同一用户在同一秒内并发渲染时互相覆盖或删除文件。
+        ts = time.time_ns()
         html_path = os.path.join(self.temp_dir, f"cake_{user_id}_{ts}.html")
         out_png = os.path.join(self.temp_dir, f"cake_{user_id}_{ts}.png")
         with open(html_path, 'w', encoding='utf-8') as f:
             f.write(self._page_html(user_name, year, month, checkin_data, total_cakes,
                                     today, avatar_path))
-        # 容器内以 root 运行时 Chromium 需 --no-sandbox；非 root 环境（本机/普通用户）不加
+        # 减少容器共享内存压力；root 容器额外关闭 Chromium sandbox。
         is_root = getattr(os, 'geteuid', lambda: 1)() == 0
-        launch_args = ['--no-sandbox'] if is_root else []
+        launch_args = ['--disable-dev-shm-usage']
+        if is_root:
+            launch_args.append('--no-sandbox')
         try:
             _submit_render_task(
                 _render_playwright, launch_args, html_path, out_png).result(timeout=120)
